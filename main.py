@@ -1,28 +1,31 @@
 from automata.tm.dtm import DTM
 from fastapi import FastAPI, Request, Depends
-from fastapi_mail import ConnectionConfig, MessageSchema, MessageType, FastMail
+#from fastapi_mail import ConnectionConfig, MessageSchema, MessageType, FastMail
 from sqlalchemy.orm import Session
 
 from sql_app import crud, models, schemas
 from sql_app.database import engine, SessionLocal
-from util.email_body import EmailSchema
+#from util.email_body import EmailSchema
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-models.Base.metadata.create_all(bind=engine)
+import pika as pk
 
+import remetente
+models.Base.metadata.create_all(bind=engine)
+"""
 conf = ConnectionConfig(
-    MAIL_USERNAME="c4e2d9012d1cee",
-    MAIL_PASSWORD="fdf5dd71ce3f67",
-    MAIL_FROM="from@example.com",
+    MAIL_USERNAME='c31967af9f3a17',
+    MAIL_PASSWORD='599a4e635c33d5',
+    MAIL_FROM='from@example.com',
     MAIL_PORT=2525,
-    MAIL_SERVER="sandbox.smtp.mailtrap.io",
+    MAIL_SERVER='smtp://sandbox.smtp.mailtrap.io',
     MAIL_STARTTLS=False,
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True
 )
-
+"""
 app = FastAPI()
 
 Instrumentator().instrument(app).expose(app)
@@ -51,12 +54,16 @@ async def get_history(id: int, db: Session = Depends(get_db)):
 
 @app.get("/get_all_history")
 async def get_all_history(db: Session = Depends(get_db)):
+    print("##############################################################")
     history = crud.get_all_history(db=db)
     return history
 
 
+
 @app.post("/dtm")
 async def dtm(info: Request, db: Session = Depends(get_db)):
+    print("##############################################################")
+    remetente.enviaMSG(str(Request))
     info = await info.json()
     states = set(info.get("states", []))
 
@@ -129,9 +136,9 @@ async def dtm(info: Request, db: Session = Depends(get_db)):
     history = schemas.History(query=str(info), result=result)
     crud.create_history(db=db, history=history)
 
-    email_shema = EmailSchema(email=["to@example.com"])
+    #email_shema = EmailSchema(email=["to@example.com"])
 
-    await simple_send(email_shema, result=result, configuration=str(info))
+    #await simple_send(email_shema, result=result, configuration=str(info))
 
     return {
         "code": result == "accepted" and "200" or "400",
@@ -151,6 +158,7 @@ async def simple_send(email: EmailSchema, result: str, configuration: str):
         body=html,
         subtype=MessageType.html)
 
+    print("Chegou aqui!")
     fm = FastMail(conf)
     await fm.send_message(message)
     return "OK"
