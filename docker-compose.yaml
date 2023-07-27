@@ -6,8 +6,32 @@ networks:
 
 volumes:
   postgres_data:
+  rabbit1:
 
 services:
+  rabbit1:
+    build:
+      context: .
+      dockerfile: Dockerfile-rabbitmq
+    image: "rabbitmq:3-management"
+    hostname: rabbit1
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "TESTVOLUME"
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+      RABBITMQ_DEFAULT_VHOST: "/"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    labels:
+      NAME: "rabbitmq1"
+    networks:
+        - my-network
+    tty: true
+    volumes:
+      - rabbit1:/var/lib/rabbitmq
+      - ./conf/:/etc/rabbitmq/
+    command: bash -c "sleep 10; rabbitmq-server;"
   my-app:
     build:
        context: .

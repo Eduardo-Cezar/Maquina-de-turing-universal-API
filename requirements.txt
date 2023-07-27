@@ -94,3 +94,8 @@ wcwidth==0.2.6
 webencodings==0.5.1
 websockets==11.0.3
 zipp==3.15.0
+fastapi
+pydantic
+starlette
+aio_pika
+setuptools>=65.5.1

@@ -1,31 +1,46 @@
 from automata.tm.dtm import DTM
 from fastapi import FastAPI, Request, Depends
-#from fastapi_mail import ConnectionConfig, MessageSchema, MessageType, FastMail
+from fastapi_mail import ConnectionConfig, MessageSchema, MessageType, FastMail
 from sqlalchemy.orm import Session
 
 from sql_app import crud, models, schemas
 from sql_app.database import engine, SessionLocal
-#from util.email_body import EmailSchema
+from util.email_body import EmailSchema
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
+import json
 import pika as pk
 
-import remetente
 models.Base.metadata.create_all(bind=engine)
-"""
+
+exchange_name = 'mtu'
+queue_name = "fila_mtu"
+mtu_routing_key = 'chave_mtu'
+ip_container = 'localhost'
+
+def connect_rabbit(request):
+    conn = pk.BlockingConnection(pk.ConnectionParameters(host=ip_container))
+    channel = conn.channel()
+    print("Conectou ao rabbitmq")
+
+    my_tag= mtu_routing_key #routing_key
+    message= request
+    channel.basic_publish(exchange=exchange_name, routing_key=my_tag, body=message)
+    conn.close()
+
 conf = ConnectionConfig(
-    MAIL_USERNAME='c31967af9f3a17',
-    MAIL_PASSWORD='599a4e635c33d5',
-    MAIL_FROM='from@example.com',
-    MAIL_PORT=2525,
-    MAIL_SERVER='smtp://sandbox.smtp.mailtrap.io',
+    MAIL_USERNAME="2ba16197295077",
+    MAIL_PASSWORD="0ea1e12f15bce3",
+    MAIL_FROM="from@example.com",
+    MAIL_PORT=587,
+    MAIL_SERVER="sandbox.smtp.mailtrap.io",
     MAIL_STARTTLS=False,
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True
 )
-"""
+
 app = FastAPI()
 
 Instrumentator().instrument(app).expose(app)
@@ -54,16 +69,24 @@ async def get_history(id: int, db: Session = Depends(get_db)):
 
 @app.get("/get_all_history")
 async def get_all_history(db: Session = Depends(get_db)):
-    print("##############################################################")
     history = crud.get_all_history(db=db)
     return history
 
-
+@app.post("/batch")
+async def batch(info: Request):
+  info = await info.json()
+  requestsx = str(info)
+  requestsx = requestsx.replace("'", '"')
+  data = json.loads(requestsx)
+  requests_list = data["requests"]
+  for request in requests_list:
+    print(request)
+    print("\n---------------------------------------------------------------------------\n")
+    connect_rabbit(request)
+  print("entrou")
 
 @app.post("/dtm")
 async def dtm(info: Request, db: Session = Depends(get_db)):
-    print("##############################################################")
-    remetente.enviaMSG(str(Request))
     info = await info.json()
     states = set(info.get("states", []))
 
@@ -136,9 +159,9 @@ async def dtm(info: Request, db: Session = Depends(get_db)):
     history = schemas.History(query=str(info), result=result)
     crud.create_history(db=db, history=history)
 
-    #email_shema = EmailSchema(email=["to@example.com"])
+    email_shema = EmailSchema(email=["to@example.com"])
 
-    #await simple_send(email_shema, result=result, configuration=str(info))
+    await simple_send(email_shema, result=result, configuration=str(info))
 
     return {
         "code": result == "accepted" and "200" or "400",
@@ -158,7 +181,6 @@ async def simple_send(email: EmailSchema, result: str, configuration: str):
         body=html,
         subtype=MessageType.html)
 
-    print("Chegou aqui!")
     fm = FastMail(conf)
     await fm.send_message(message)
     return "OK"
